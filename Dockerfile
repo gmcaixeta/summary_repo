@@ -1,0 +1,5 @@
+FROM rocker/tidyverse
+
+COPY . .
+
+
