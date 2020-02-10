@@ -1,182 +1,38 @@
-library(ggplot2)
+library(data.tree)
+library(treemap)
+head(attr)
 library(dplyr)
-library(plotly)
-head(test2)
+attr[c("pathString")] <- list(NULL)
+attr <- setNames(attr, c("x","y","z"))
 
-library(tidyverse)
-library(lubridate)
-df <- as_tibble(test2)
-
-p2 <- df %>%
-  mutate(wday = wday(data, label = TRUE),
-         
-         month = month(data, label = TRUE)) %>%
-  
-  mutate(wday = fct_relevel(wday, c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) %>%
-  
-  group_by(wday, month) %>%
-  
-  summarise(mean_sales = mean(saida)) %>%
-  
-  ggplot(aes(month, wday, fill = mean_sales)) +
-  
-  geom_tile() +
-  
-  labs(x = "Month of the year", y = "Day of the week") +
-  
-  scale_fill_distiller(palette = "Spectral")
-
-p2
-
-ggplotly(p2)
+attr$pathString <- paste("total", 
+                            attr$x, 
+                            attr$y,
+                            #attr$z,
+                            sep = "/")
 
 
 
-se <- function(x) sqrt(var(x)/length(x)) 
+attr <- attr [!duplicated(attr[c("x","y")]),]
+
+gx <- attr %>% slice(1:1000)
 
 
+head(gx)
+tree <- as.Node(attr)
+plot(tree)
 
-df1 <- df %>%
-  mutate(year = year(data),
-         month = as.factor(month(data)))  %>% 
-  filter(filial == c("1"))  %>%  group_by(sku, filial, year, month) %>% 
-  summarise(AveragePrice = mean(saida)) %>% ggplot(aes(x=month, y=AveragePrice, fill=month), color="white") + geom_bar(width=1, stat='identity') + 
-  geom_errorbar(aes(ymin = AveragePrice - se(AveragePrice), 
-                    ymax = AveragePrice + se(AveragePrice), 
-                    color = month), 
-                width = .2) + scale_y_continuous(breaks = 0:nlevels(month)) +
-  facet_wrap(~year) + theme_minimal() + 
-  theme(axis.ticks = element_blank(),
-        axis.text.y=element_blank(),
-        axis.title = element_blank(),
-        axis.line = element_blank(), 
-        plot.background=element_rect(), #fill="#FFF1E0"
-        legend.position="none", plot.title=element_text(hjust=0.5)) + 
-  
-  coord_polar() + labs(title="Seasonal cycle \n Conventional Avocados") + 
-  scale_fill_manual(values=c('#57FCE0', '#57A6FC', '#3C546E', '#4AFA76', '#95CFA4', '#C0E436', '#F2A42D', '#F25F2D', '#F2442D',
-                             '#AB4949', '#4950AB', '#4974AB'))
-library(ggthemes)
-df1
-tail(df)
+library(igraph)
+plot(as.igraph(tree, directed = TRUE, direction = "climb"))
+as.igraph(tree)
+
+library(networkD3)
+acmeNetwork <- ToDataFrameNetwork(tree, "name")
+simpleNetwork(acmeNetwork[-3], fontSize = 12)
 
 
-r_avg <- df %>%
-  mutate(year = year(data),
-         month = as.factor(month(data, label = TRUE))) %>% 
-  filter(filial == c("1")) %>% group_by(year, month) %>% 
-  summarise(avg = sum(saida)) %>% 
-  select( year, month, avg)
-
-
-
-structured_data <- spread_(r_avg, key="year", value="avg")
-
-
-colnames(structured_data) <- c("Months", "First_year", "Second_year")
-
-
-structured_data$first_pct <- NA
-structured_data$second_pct <- NA
-
-structured_data$first_pct <- (structured_data$Second_year - structured_data$First_year) /structured_data$First_year  * 100
-
-structured_data<- structured_data %>% 
-  mutate(first_cond=ifelse(first_pct > 0, "Positive", "Negative")
-         )
-
-
-firstp_change <- ggplot(structured_data) +
-  geom_segment( aes(x=Months, xend=Months, y=First_year, yend=Second_year), color="#6E6A6A") +
-  geom_point( aes(x=Months, y=First_year), color="#F74B4B", size=3 ) +
-  geom_point( aes(x=Months, y=Second_year),color="#36ACD7", size=3 ) +
-  coord_flip()+ 
-  theme_economist() +
-  theme(
-    legend.position = "top",
-    plot.title=element_text(hjust=0.5),
-    plot.background=element_rect(fill="#F4F6F7")
-  ) +
-  labs(title="Conventional Avocado Price changes \n (2015 - 2016)", x="Months", y="Price",
-       caption="Red: Year of 2015, Blue: Year of 2016")
-
-ggplotly(firstp_change)
-
-
-first_pct_dif <- structured_data %>% select(Months, first_pct, first_cond) %>%
-  ggplot(aes(fill=first_cond)) + geom_bar(stat='identity', aes(x=Months, y=round(first_pct,2)), color="black") + 
-  theme_economist() + theme(axis.text.x=element_text(angle=90), plot.background=element_rect(fill="#F4F6F7"), legend.position="bottom") + 
-  labs(x="Month", y="% Difference") + 
-  guides(fill=guide_legend(title="Diff Status")) + scale_fill_manual(values=c("#FB4D42", "#ADE175"))
-
-first_pct_dif
-(structured_data$Second_year - structured_data$First_year) / structured_data$First_year
-
-library(cowplot)
-plot_grid(firstp_change, first_pct_dif,  nrow=2, ncol=1)
-
-ggplotly(firstp_change)
-
-
-df %>%
-  
-  group_by(data, filial) %>%
-  
-  summarise(sales = sum(saida)) %>%
-  
-  ungroup() %>%
-  
-  ggplot(aes(data, sales)) +
-  
-  geom_line(color = "blue") +
-  
-  scale_y_log10() +
-  
-  facet_wrap(~ filial)
-
-
-p1 <- df %>%
-  
-  ggplot(aes(reorder(filial, -saida, FUN = median), saida, color = filial)) +
-  
-  geom_boxplot() +
-  
-  scale_y_log10() +
-  
-  theme(legend.position = "none") +
-  
-  labs(x = "Store number (reordered)")
-p1
-
-
-dfx <- df
-
-dfx$month_year <- format(as.Date(df$data), "%Y-%m")
-dfx$month <- format(as.Date(df$data), "%m")
-dfx$year <- format(as.Date(df$data), "%Y")
-
-
-dfx$monthabb <- sapply(dfx$month, function(x) month.abb[as.numeric(x)])
-dfx$monthabb = factor(dfx$monthabb, levels = month.abb)
-
-dfx <- df %>%  mutate(wday = wday(data, label = TRUE),
-                      
-                      month = month(data, label = TRUE)) %>%
-  
-  filter(saida > 0) %>%
-  
-  group_by(month, filial) %>%
-  
-  summarise(sales = sum(saida)) 
-
-# # Let's see if there are seasonal patterns with conventional avocadoes
-ggplot(dfx, aes(x = sales)) + 
-  geom_density(alpha = .5) + 
-  theme_economist()  + theme(plot.title=element_text(hjust=0.5), plot.background=element_rect(fill="#F9E79F")) + 
-  guides(fill = FALSE) + labs(title="Distribution of Prices by year", x = 'Average Price', y = 'Density') + 
-  scale_fill_manual(values=c("#2E64FE", "#40FF00", "#FE642E", "#FE2E2E"))
-
-
-dfx
-
-
+useRtree <- as.Node(useRdf, pathDelimiter = "|")
+head(attr)
+#plot with networkD3
+useRtreeList <- ToListExplicit(tree, unname = TRUE)
+radialNetwork( useRtreeList)
